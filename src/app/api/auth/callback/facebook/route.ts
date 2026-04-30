@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import {
   exchangeCodeForToken,
@@ -8,6 +7,7 @@ import {
 import { encrypt } from "@/lib/crypto";
 import { setSessionOnResponse } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { relativeRedirect } from "@/lib/redirect";
 
 const STATE_COOKIE = "oauth_state";
 
@@ -20,24 +20,18 @@ export async function GET(req: Request) {
 
   if (error) {
     const desc = errorDescription ?? error;
-    return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(desc)}`, req.url),
-    );
+    return relativeRedirect(`/login?error=${encodeURIComponent(desc)}`);
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(
-      new URL("/login?error=missing_params", req.url),
-    );
+    return relativeRedirect("/login?error=missing_params");
   }
 
   // Verifica CSRF state (lê via cookies() — leitura é segura)
   const cookieStore = await cookies();
   const storedState = cookieStore.get(STATE_COOKIE)?.value;
   if (!storedState || storedState !== state) {
-    return NextResponse.redirect(
-      new URL("/login?error=invalid_state", req.url),
-    );
+    return relativeRedirect("/login?error=invalid_state");
   }
 
   try {
@@ -84,16 +78,13 @@ export async function GET(req: Request) {
       },
     });
 
-    // 6. Cria response com TODAS modificações de cookie (set + delete) na
-    // mesma response — não mistura cookieStore com response.cookies.
-    const response = NextResponse.redirect(new URL("/", req.url));
+    // 6. Redirect relativo pra / com cookie de sessão na mesma response
+    const response = relativeRedirect("/");
     response.cookies.delete(STATE_COOKIE);
     return setSessionOnResponse(user.id, response);
   } catch (err) {
     console.error("OAuth callback error:", err);
     const message = err instanceof Error ? err.message : "unknown_error";
-    return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(message)}`, req.url),
-    );
+    return relativeRedirect(`/login?error=${encodeURIComponent(message)}`);
   }
 }
