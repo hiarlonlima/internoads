@@ -2,7 +2,9 @@ import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import type { NextResponse } from "next/server";
 
-export const SESSION_COOKIE = "session";
+// Nome único do cookie pra evitar conflito com cookies que Vercel ou outras
+// libs possam setar com nome genérico "session".
+export const SESSION_COOKIE = "iads_session";
 const SESSION_DURATION_DAYS = 30;
 
 function getSecret(): Uint8Array {

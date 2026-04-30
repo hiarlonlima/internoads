@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     );
   }
 
-  // Verifica CSRF state
+  // Verifica CSRF state (lê via cookies() — leitura é segura)
   const cookieStore = await cookies();
   const storedState = cookieStore.get(STATE_COOKIE)?.value;
   if (!storedState || storedState !== state) {
@@ -39,7 +39,6 @@ export async function GET(req: Request) {
       new URL("/login?error=invalid_state", req.url),
     );
   }
-  cookieStore.delete(STATE_COOKIE);
 
   try {
     // 1. Troca o code por short-lived token (~1h)
@@ -68,7 +67,7 @@ export async function GET(req: Request) {
     });
 
     // 5. Salva token criptografado
-    const expiresInSec = longLived.expires_in ?? 60 * 24 * 60 * 60; // fallback 60d
+    const expiresInSec = longLived.expires_in ?? 60 * 24 * 60 * 60;
     const expiresAt = new Date(Date.now() + expiresInSec * 1000);
     const encryptedToken = encrypt(longLived.access_token);
 
@@ -85,9 +84,10 @@ export async function GET(req: Request) {
       },
     });
 
-    // 6. Cria sessão JWT setando o cookie direto na response
-    // (cookies().set() em route handlers não persiste em produção Vercel)
+    // 6. Cria response com TODAS modificações de cookie (set + delete) na
+    // mesma response — não mistura cookieStore com response.cookies.
     const response = NextResponse.redirect(new URL("/", req.url));
+    response.cookies.delete(STATE_COOKIE);
     return setSessionOnResponse(user.id, response);
   } catch (err) {
     console.error("OAuth callback error:", err);
