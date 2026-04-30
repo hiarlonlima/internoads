@@ -52,23 +52,31 @@ export async function setPasswordAction(formData: FormData) {
   return { ok: true };
 }
 
-export async function loginWithPasswordAction(formData: FormData) {
+export async function loginWithPasswordAction(
+  formData: FormData,
+): Promise<void> {
   const email = formData.get("email")?.toString().trim().toLowerCase() ?? "";
   const password = formData.get("password")?.toString() ?? "";
 
   if (!email || !password) {
-    return { ok: false, error: "Email e senha são obrigatórios" };
+    redirect(
+      `/login?error=${encodeURIComponent("Email e senha são obrigatórios")}`,
+    );
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.passwordHash) {
     // Mensagem genérica pra não revelar se email existe
-    return { ok: false, error: "Email ou senha inválidos" };
+    redirect(
+      `/login?error=${encodeURIComponent("Email ou senha inválidos")}`,
+    );
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
-    return { ok: false, error: "Email ou senha inválidos" };
+    redirect(
+      `/login?error=${encodeURIComponent("Email ou senha inválidos")}`,
+    );
   }
 
   await createSession(user.id);
