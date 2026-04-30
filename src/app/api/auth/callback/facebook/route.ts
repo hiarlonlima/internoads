@@ -6,7 +6,7 @@ import {
   getUserInfo,
 } from "@/lib/facebook";
 import { encrypt } from "@/lib/crypto";
-import { createSession } from "@/lib/session";
+import { setSessionOnResponse } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 const STATE_COOKIE = "oauth_state";
@@ -85,12 +85,10 @@ export async function GET(req: Request) {
       },
     });
 
-    // 6. Cria sessão JWT
-
-    // 6. Cria sessão JWT
-    await createSession(user.id);
-
-    return NextResponse.redirect(new URL("/", req.url));
+    // 6. Cria sessão JWT setando o cookie direto na response
+    // (cookies().set() em route handlers não persiste em produção Vercel)
+    const response = NextResponse.redirect(new URL("/", req.url));
+    return setSessionOnResponse(user.id, response);
   } catch (err) {
     console.error("OAuth callback error:", err);
     const message = err instanceof Error ? err.message : "unknown_error";

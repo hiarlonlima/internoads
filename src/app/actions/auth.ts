@@ -1,14 +1,9 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getSession, createSession } from "@/lib/session";
-import {
-  hashPassword,
-  verifyPassword,
-  validatePassword,
-} from "@/lib/password";
+import { getSession } from "@/lib/session";
+import { hashPassword, validatePassword } from "@/lib/password";
 
 export async function setPasswordAction(formData: FormData) {
   const session = await getSession();
@@ -52,33 +47,5 @@ export async function setPasswordAction(formData: FormData) {
   return { ok: true };
 }
 
-export async function loginWithPasswordAction(
-  formData: FormData,
-): Promise<void> {
-  const email = formData.get("email")?.toString().trim().toLowerCase() ?? "";
-  const password = formData.get("password")?.toString() ?? "";
-
-  if (!email || !password) {
-    redirect(
-      `/login?error=${encodeURIComponent("Email e senha são obrigatórios")}`,
-    );
-  }
-
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !user.passwordHash) {
-    // Mensagem genérica pra não revelar se email existe
-    redirect(
-      `/login?error=${encodeURIComponent("Email ou senha inválidos")}`,
-    );
-  }
-
-  const valid = await verifyPassword(password, user.passwordHash);
-  if (!valid) {
-    redirect(
-      `/login?error=${encodeURIComponent("Email ou senha inválidos")}`,
-    );
-  }
-
-  await createSession(user.id);
-  redirect("/");
-}
+// loginWithPasswordAction migrado pra /api/auth/login-password (route handler)
+// porque server action + redirect + cookie nem sempre persiste em produção.

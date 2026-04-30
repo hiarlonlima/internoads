@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
-import { loginWithPasswordAction } from "@/app/actions/auth";
 
 export default async function LoginPage({
   searchParams,
@@ -30,9 +29,10 @@ export default async function LoginPage({
           </div>
         )}
 
-        {/* Login email + senha */}
+        {/* Login email + senha — POST direto pra route handler (cookie confiável) */}
         <form
-          action={loginWithPasswordAction}
+          method="post"
+          action="/api/auth/login-password"
           className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 space-y-4"
         >
           <div>
