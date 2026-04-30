@@ -12,6 +12,9 @@ import {
   formatPercent,
 } from "@/lib/format";
 
+// Sync de campanhas + insights pode levar 30-60s (50 contas × 6 períodos)
+export const maxDuration = 60;
+
 interface SearchParams {
   period?: string;
   bm?: string;
