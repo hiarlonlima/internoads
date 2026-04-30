@@ -47,20 +47,40 @@ export async function setSessionOnResponse(
   response: NextResponse,
 ): Promise<NextResponse> {
   const token = await generateSessionToken(userId);
+  // Seta via API do NextResponse
   response.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+  // Seta também via header Set-Cookie raw — redundância em caso de bug no
+  // Next.js 16 cookie handling em produção Vercel.
+  const maxAgeSec = SESSION_COOKIE_OPTIONS.maxAge;
+  const secureFlag = SESSION_COOKIE_OPTIONS.secure ? "; Secure" : "";
+  const rawCookie = `${SESSION_COOKIE}=${token}; Path=/; HttpOnly${secureFlag}; SameSite=Lax; Max-Age=${maxAgeSec}`;
+  response.headers.append("Set-Cookie", rawCookie);
+  console.log(
+    `[session] set cookie pra user ${userId} (NODE_ENV=${process.env.NODE_ENV}, secure=${SESSION_COOKIE_OPTIONS.secure})`,
+  );
   return response;
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
+  if (!token) {
+    console.log("[session] read: NO cookie present");
+    return null;
+  }
 
   try {
     const { payload } = await jwtVerify(token, getSecret());
-    if (typeof payload.userId !== "string") return null;
+    if (typeof payload.userId !== "string") {
+      console.log("[session] read: cookie present but payload invalid");
+      return null;
+    }
     return { userId: payload.userId };
-  } catch {
+  } catch (err) {
+    console.log(
+      "[session] read: cookie present but JWT verify failed:",
+      err instanceof Error ? err.message : "unknown",
+    );
     return null;
   }
 }
