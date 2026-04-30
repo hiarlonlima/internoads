@@ -41,22 +41,21 @@ export async function createSession(userId: string): Promise<void> {
   cookieStore.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
 }
 
-/** Cria sessão setando o cookie direto na response (Route Handlers). */
+/** Cria sessão setando o cookie direto na response (Route Handlers).
+ * Usa SÓ o método header raw — `response.cookies.set` do Next.js 16 em redirects
+ * 303 estava se comportando inconsistentemente em produção Vercel.
+ */
 export async function setSessionOnResponse(
   userId: string,
   response: NextResponse,
 ): Promise<NextResponse> {
   const token = await generateSessionToken(userId);
-  // Seta via API do NextResponse
-  response.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
-  // Seta também via header Set-Cookie raw — redundância em caso de bug no
-  // Next.js 16 cookie handling em produção Vercel.
   const maxAgeSec = SESSION_COOKIE_OPTIONS.maxAge;
   const secureFlag = SESSION_COOKIE_OPTIONS.secure ? "; Secure" : "";
   const rawCookie = `${SESSION_COOKIE}=${token}; Path=/; HttpOnly${secureFlag}; SameSite=Lax; Max-Age=${maxAgeSec}`;
   response.headers.append("Set-Cookie", rawCookie);
   console.log(
-    `[session] set cookie pra user ${userId} (NODE_ENV=${process.env.NODE_ENV}, secure=${SESSION_COOKIE_OPTIONS.secure})`,
+    `[session] set cookie pra user ${userId} via Set-Cookie header raw`,
   );
   return response;
 }
