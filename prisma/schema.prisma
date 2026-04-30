@@ -1,0 +1,142 @@
+// Schema do Interno ADS
+// Hierarquia: User -> BusinessManager -> AdAccount -> Campaign -> Insight
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String   @id @default(uuid())
+  facebookUserId String   @unique
+  name           String
+  email          String?  @unique
+  picture        String?
+
+  // Senha pra login email+senha. Opcional — pode estar null se ainda não configurou.
+  // Hash bcrypt.
+  passwordHash String?
+
+  token            Token?
+  businessManagers BusinessManager[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Token {
+  id     String @id @default(uuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  // Long-lived token criptografado (AES-256-GCM)
+  accessTokenEncrypted String   @db.Text
+  expiresAt            DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BusinessManager {
+  id     String @id @default(uuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  metaBusinessId String
+  name           String
+
+  adAccounts AdAccount[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  syncedAt  DateTime @default(now())
+
+  @@unique([userId, metaBusinessId])
+  @@index([userId])
+}
+
+model AdAccount {
+  id                String          @id @default(uuid())
+  businessManager   BusinessManager @relation(fields: [businessManagerId], references: [id], onDelete: Cascade)
+  businessManagerId String
+
+  metaAccountId String // formato: "act_123456789"
+  name          String
+  accountStatus Int // 1=ATIVA, 2=DESABILITADA, 3=NAO_RESOLVIDA, etc
+  currency      String // "BRL", "USD"
+  timezone      String // "America/Sao_Paulo"
+
+  campaigns Campaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  syncedAt  DateTime @default(now())
+
+  @@unique([businessManagerId, metaAccountId])
+  @@index([businessManagerId])
+}
+
+model Campaign {
+  id          String    @id @default(uuid())
+  adAccount   AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  adAccountId String
+
+  metaCampaignId String
+  name           String
+  status         String // ACTIVE, PAUSED, ARCHIVED, DELETED
+  objective      String? // OUTCOME_SALES, OUTCOME_ENGAGEMENT, etc
+  dailyBudget    Decimal? @db.Decimal(12, 2)
+  lifetimeBudget Decimal? @db.Decimal(12, 2)
+
+  insights Insight[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  syncedAt  DateTime @default(now())
+
+  @@unique([adAccountId, metaCampaignId])
+  @@index([adAccountId])
+}
+
+model Insight {
+  id         String   @id @default(uuid())
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+
+  // Período (date_preset da Meta): "today", "yesterday", "last_7d", "last_14d", "last_30d", "last_90d"
+  period String @default("last_30d")
+
+  // Janela de tempo concreta retornada pela Meta (informativo)
+  dateStart DateTime @db.Date
+  dateStop  DateTime @db.Date
+
+  // Métricas brutas (vêm direto da Marketing API)
+  spend       Decimal  @default(0) @db.Decimal(12, 2)
+  impressions Int      @default(0)
+  reach       Int      @default(0)
+  clicks      Int      @default(0)
+  frequency   Decimal  @default(0) @db.Decimal(8, 4)
+  cpc         Decimal? @db.Decimal(10, 4)
+  ctr         Decimal? @db.Decimal(8, 4) // em %
+  cpm         Decimal? @db.Decimal(10, 2)
+
+  // Conversões (extraídos do array `actions` da API)
+  purchases     Int     @default(0)
+  purchaseValue Decimal @default(0) @db.Decimal(12, 2)
+  cpa           Decimal? @db.Decimal(10, 2)
+  roas          Decimal? @db.Decimal(8, 4)
+
+  // Mensagens (action_type=onsite_conversion.messaging_conversation_started_7d)
+  messagesInitiated       Int      @default(0)
+  costPerMessageInitiated Decimal? @db.Decimal(10, 2)
+
+  syncedAt DateTime @default(now())
+
+  @@unique([campaignId, period])
+  @@index([campaignId])
+  @@index([period])
+}
